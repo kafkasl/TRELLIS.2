@@ -60,6 +60,7 @@ export CC=gcc-11
 export CXX=g++-11
 pip install --no-build-isolation git+https://github.com/NVlabs/nvdiffrast.git
 pip install --no-build-isolation git+https://github.com/JeffreyXiang/diffoctreerast.git
+  pip install --no-build-isolation git+https://github.com/JeffreyXiang/CuMesh.git
 
 log "Initializing submodules and installing kaolin"
 cd "$REPO_DIR"
