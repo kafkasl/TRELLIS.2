@@ -44,7 +44,7 @@ pip install \
   rembg onnxruntime trimesh open3d xatlas pyvista pymeshfix igraph
 pip install git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67b12c460c7057d642626897ec8
 pip install \
-  'transformers==4.46.3' \
+  'transformers==4.56.0' \
   'numpy<2' \
   'gradio==4.44.1' \
   'gradio_client==1.3.0' \
