@@ -626,7 +626,6 @@ if __name__ == "__main__":
 
     pipeline = Trellis2ImageTo3DPipeline.from_pretrained('microsoft/TRELLIS.2-4B')
     pipeline.cuda()
-    
     envmap = {
         'forest': EnvMap(torch.tensor(
             cv2.cvtColor(cv2.imread('assets/hdri/forest.exr', cv2.IMREAD_UNCHANGED), cv2.COLOR_BGR2RGB),
@@ -641,5 +640,13 @@ if __name__ == "__main__":
             dtype=torch.float32, device='cuda'
         )),
     }
-    
-    demo.launch(css=css, head=head)
+
+    launch_kwargs = {
+        "share": os.environ.get("TRELLIS_GRADIO_SHARE", "false").lower() in {"1", "true", "yes", "on"},
+        "server_name": os.environ.get("TRELLIS_GRADIO_SERVER_NAME"),
+        "server_port": int(os.environ.get("TRELLIS_GRADIO_SERVER_PORT", "7860")),
+        "css": css,
+        "head": head,
+    }
+    launch_kwargs = {k: v for k, v in launch_kwargs.items() if v is not None}
+    demo.launch(**launch_kwargs)
