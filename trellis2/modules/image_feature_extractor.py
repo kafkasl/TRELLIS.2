@@ -78,12 +78,22 @@ class DinoV3FeatureExtractor:
     def cpu(self):
         self.model.cpu()
 
+    def _encoder_layers(self):
+        for parent in (self.model, getattr(self.model, 'model', None), getattr(self.model, 'encoder', None)):
+            if parent is None:
+                continue
+            for attr in ('layer', 'layers'):
+                layers = getattr(parent, attr, None)
+                if layers is not None:
+                    return layers
+        raise AttributeError(f"Could not find DINOv3 encoder layers in {type(self.model).__name__}")
+
     def extract_features(self, image: torch.Tensor) -> torch.Tensor:
         image = image.to(self.model.embeddings.patch_embeddings.weight.dtype)
         hidden_states = self.model.embeddings(image, bool_masked_pos=None)
         position_embeddings = self.model.rope_embeddings(image)
 
-        for i, layer_module in enumerate(self.model.layer):
+        for layer_module in self._encoder_layers():
             hidden_states = layer_module(
                 hidden_states,
                 position_embeddings=position_embeddings,
