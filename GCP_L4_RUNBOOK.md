@@ -39,6 +39,8 @@ Run TRELLIS.2 on GCP L4 reproducibly, with all fixes captured in the fork and no
 
 - `setup.sh` initializes `o-voxel` submodule before building.
 - Extension installs are rerunnable/idempotent via clone-or-update.
+- `o-voxel` installs with `--no-deps` after `CuMesh`/`FlexGEMM` to avoid redundant rebuilds.
+- Standard `pillow==12.2.0` is force-reinstalled instead of `pillow-simd` to avoid mixed PIL/WebP installs.
 - `flash-attn==2.7.3` installs with `--no-build-isolation`.
 - Torch stack includes matching `torch`, `torchvision`, and `torchaudio` 2.6.0/cu124.
 - `scripts/setup_gcp_l4.sh` delegates to upstream `setup.sh` instead of the obsolete TRELLIS v1 stack.
