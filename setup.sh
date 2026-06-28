@@ -154,5 +154,5 @@ if [ "$OVOXEL" = true ] ; then
     fi
     rm -rf /tmp/extensions/o-voxel
     cp -r "$WORKDIR/o-voxel" /tmp/extensions/o-voxel
-    pip install /tmp/extensions/o-voxel --no-build-isolation
+    pip install /tmp/extensions/o-voxel --no-build-isolation --no-deps
 fi

@@ -4,8 +4,8 @@ set -euo pipefail
 # GCP L4 / Deep Learning VM setup for TRELLIS.2.
 # Expected image family: PyTorch CUDA Ubuntu DLVM with NVIDIA driver + CUDA toolkit.
 # This script intentionally delegates package selection to upstream setup.sh.
-# For SSH-safe long installs, run with nohup/tmux, e.g.:
-#   nohup bash scripts/setup_gcp_l4.sh > ~/trellis-setup.log 2>&1 &
+# For SSH-safe long installs, run from the persistent SSH connection
+# in a local tmux pane and tee output to a log.
 
 REPO_DIR="${TRELLIS_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 VENV_DIR="${TRELLIS_VENV_DIR:-$HOME/trellis-venv}"
