@@ -1,35 +1,43 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# GCP L4 / Deep Learning VM setup for TRELLIS.
-# Expected base image:
-#   pytorch-2-3-cu121-v20250327-ubuntu-2204-py310
-# This image provides Python 3.10, CUDA 12.1, and torch 2.3.0+cu121.
+# GCP L4 / Deep Learning VM setup for TRELLIS.2.
+# Expected image family: PyTorch CUDA Ubuntu DLVM with NVIDIA driver + CUDA toolkit.
+# This script intentionally delegates package selection to upstream setup.sh.
+# For SSH-safe long installs, run with nohup/tmux, e.g.:
+#   nohup bash scripts/setup_gcp_l4.sh > ~/trellis-setup.log 2>&1 &
 
 REPO_DIR="${TRELLIS_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 VENV_DIR="${TRELLIS_VENV_DIR:-$HOME/trellis-venv}"
 PYTHON="${PYTHON:-python3}"
+TORCH_INDEX_URL="${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu124}"
+SETUP_FLAGS=(--basic --flash-attn --nvdiffrast --nvdiffrec --cumesh --o-voxel --flexgemm)
 
 log() { printf '\n\033[1;32m[trellis-gcp]\033[0m %s\n' "$*"; }
 
 log "Repo: $REPO_DIR"
 log "Venv: $VENV_DIR"
 
-if ! command -v gcc-11 >/dev/null 2>&1 || ! command -v g++-11 >/dev/null 2>&1; then
-  log "Installing gcc-11/g++-11 build tools"
-  sudo apt-get update
-  sudo apt-get install -y gcc-11 g++-11 build-essential git wget curl
-fi
+log "Installing OS build prerequisites"
+sudo apt-get update
+sudo apt-get install -y python3.10-venv python3.10-dev build-essential git curl ninja-build
 
-log "Creating venv with access to system torch/CUDA packages"
+log "Creating Python venv"
 if [ ! -d "$VENV_DIR" ]; then
-  "$PYTHON" -m venv --system-site-packages "$VENV_DIR"
+  if [ "${TRELLIS_VENV_SYSTEM_SITE:-0}" = "1" ]; then
+    "$PYTHON" -m venv --system-site-packages "$VENV_DIR"
+  else
+    "$PYTHON" -m venv "$VENV_DIR"
+  fi
 fi
 # shellcheck disable=SC1091
 source "$VENV_DIR/bin/activate"
-python -m pip install --upgrade pip setuptools wheel
+python -m pip install --upgrade pip setuptools wheel packaging ninja
 
-log "Checking base torch/CUDA"
+log "Installing upstream TRELLIS.2 torch stack"
+python -m pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url "$TORCH_INDEX_URL"
+
+log "Checking CUDA"
 python - <<'PY'
 import torch
 print('torch:', torch.__version__)
@@ -38,50 +46,31 @@ print('cuda_available:', torch.cuda.is_available())
 assert torch.cuda.is_available(), 'CUDA is not available; check VM image/driver/GPU'
 PY
 
-log "Installing TRELLIS basic/demo dependencies with known-compatible pins"
-pip install \
-  pillow imageio imageio-ffmpeg tqdm easydict opencv-python-headless scipy ninja \
-  rembg onnxruntime trimesh open3d xatlas pyvista pymeshfix igraph
-pip install git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67b12c460c7057d642626897ec8
-pip install \
-  'transformers==4.46.3' \
-  'numpy<2' \
-  'gradio==4.44.1' \
-  'gradio_client==1.3.0' \
-  'gradio_litmodel3d==0.0.1' \
-  'pydantic==2.10.6'
-
-log "Installing xformers and sparse conv"
-pip install 'xformers==0.0.26.post1'
-pip install spconv-cu120
-
-log "Building CUDA rasterizer dependencies"
-export CC=gcc-11
-export CXX=g++-11
-pip install --no-build-isolation git+https://github.com/NVlabs/nvdiffrast.git
-pip install --no-build-isolation git+https://github.com/JeffreyXiang/diffoctreerast.git
-
-log "Initializing submodules and installing kaolin"
+log "Initializing repo submodules"
 cd "$REPO_DIR"
 git submodule update --init --recursive
-pip install kaolin -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.3.0_cu121.html
 
-log "Installing mip-splatting gaussian rasterizer"
-if [ ! -d /tmp/mip-splatting ]; then
-  git clone https://github.com/autonomousvision/mip-splatting.git /tmp/mip-splatting
-else
-  git -C /tmp/mip-splatting pull --ff-only || true
-fi
-pip install --no-build-isolation /tmp/mip-splatting/submodules/diff-gaussian-rasterization/
+log "Running upstream setup.sh ${SETUP_FLAGS[*]}"
+export MAX_JOBS="${MAX_JOBS:-4}"
+export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-8.9}"
+# shellcheck disable=SC1091
+. ./setup.sh "${SETUP_FLAGS[@]}"
 
 log "Verifying critical imports"
 python - <<'PY'
-import torch, gradio, gradio_client, transformers, numpy
-print('torch', torch.__version__)
-print('gradio', gradio.__version__)
-print('gradio_client', gradio_client.__version__)
-print('transformers', transformers.__version__)
-print('numpy', numpy.__version__)
+import importlib, torch
+mods = [
+    'torch', 'torchaudio', 'torchvision', 'flash_attn', 'cumesh', 'flex_gemm',
+    'nvdiffrast.torch', 'nvdiffrec_render', 'nvdiffrec_render.light',
+    'o_voxel', 'utils3d', 'utils3d.torch', 'gradio', 'gradio_client',
+    'transformers', 'numpy', 'PIL', 'cv2', 'kornia', 'timm',
+]
+for m in mods:
+    mod = importlib.import_module(m)
+    print(f'{m}: OK {mod.__dict__.get("__version__", "")}')
+print('torch:', torch.__version__, 'cuda:', torch.version.cuda, 'available:', torch.cuda.is_available())
+if torch.cuda.is_available():
+    print('gpu:', torch.cuda.get_device_name(0))
 PY
 
 log "Setup complete. Run: bash scripts/run_gcp_demo.sh"

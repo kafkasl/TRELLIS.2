@@ -66,13 +66,32 @@ else
     exit 1
 fi
 
+clone_or_update() {
+    local repo="$1"
+    local dest="$2"
+    local ref="${3:-}"
+    mkdir -p "$(dirname "$dest")"
+    if [ -d "$dest/.git" ] ; then
+        git -C "$dest" fetch --tags origin
+    else
+        rm -rf "$dest"
+        git clone --recursive "$repo" "$dest"
+    fi
+    if [ -n "$ref" ] ; then
+        git -C "$dest" checkout "$ref"
+    else
+        git -C "$dest" pull --ff-only || true
+    fi
+    git -C "$dest" submodule update --init --recursive
+}
+
 if [ "$NEW_ENV" = true ] ; then
     conda create -n trellis2 python=3.10
     conda activate trellis2
     if [ "$PLATFORM" = "cuda" ] ; then
-        pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
+        pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
     elif [ "$PLATFORM" = "hip" ] ; then
-        pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/rocm6.2.4
+        pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/rocm6.2.4
     fi
 fi
 
@@ -102,9 +121,8 @@ fi
 
 if [ "$NVDIFFRAST" = true ] ; then
     if [ "$PLATFORM" = "cuda" ] ; then
-        mkdir -p /tmp/extensions
-        git clone -b v0.4.0 https://github.com/NVlabs/nvdiffrast.git /tmp/extensions/nvdiffrast
-        pip install /tmp/extensions/nvdiffrast --no-build-isolation
+        clone_or_update https://github.com/NVlabs/nvdiffrast.git /tmp/extensions/nvdiffrast v0.4.0
+        pip install /tmp/extensions/nvdiffrast --no-build-isolation --no-deps
     else
         echo "[NVDIFFRAST] Unsupported platform: $PLATFORM"
     fi
@@ -112,28 +130,29 @@ fi
 
 if [ "$NVDIFFREC" = true ] ; then
     if [ "$PLATFORM" = "cuda" ] ; then
-        mkdir -p /tmp/extensions
-        git clone -b renderutils https://github.com/JeffreyXiang/nvdiffrec.git /tmp/extensions/nvdiffrec
-        pip install /tmp/extensions/nvdiffrec --no-build-isolation
+        clone_or_update https://github.com/JeffreyXiang/nvdiffrec.git /tmp/extensions/nvdiffrec renderutils
+        pip install /tmp/extensions/nvdiffrec --no-build-isolation --no-deps
     else
         echo "[NVDIFFREC] Unsupported platform: $PLATFORM"
     fi
 fi
 
 if [ "$CUMESH" = true ] ; then
-    mkdir -p /tmp/extensions
-    git clone https://github.com/JeffreyXiang/CuMesh.git /tmp/extensions/CuMesh --recursive
-    pip install /tmp/extensions/CuMesh --no-build-isolation
+    clone_or_update https://github.com/JeffreyXiang/CuMesh.git /tmp/extensions/CuMesh
+    pip install /tmp/extensions/CuMesh --no-build-isolation --no-deps
 fi
 
 if [ "$FLEXGEMM" = true ] ; then
-    mkdir -p /tmp/extensions
-    git clone https://github.com/JeffreyXiang/FlexGEMM.git /tmp/extensions/FlexGEMM --recursive
-    pip install /tmp/extensions/FlexGEMM --no-build-isolation
+    clone_or_update https://github.com/JeffreyXiang/FlexGEMM.git /tmp/extensions/FlexGEMM
+    pip install /tmp/extensions/FlexGEMM --no-build-isolation --no-deps
 fi
 
 if [ "$OVOXEL" = true ] ; then
     mkdir -p /tmp/extensions
-    cp -r o-voxel /tmp/extensions/o-voxel
+    if [ -d "$WORKDIR/.git" ] ; then
+        git -C "$WORKDIR" submodule update --init --recursive
+    fi
+    rm -rf /tmp/extensions/o-voxel
+    cp -r "$WORKDIR/o-voxel" /tmp/extensions/o-voxel
     pip install /tmp/extensions/o-voxel --no-build-isolation
 fi
