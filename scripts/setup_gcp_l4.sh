@@ -8,7 +8,7 @@ set -euo pipefail
 # in a local tmux pane and tee output to a log.
 
 REPO_DIR="${TRELLIS_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-VENV_DIR="${TRELLIS_VENV_DIR:-$HOME/trellis-venv}"
+VENV_DIR="${TRELLIS_VENV_DIR:-$HOME/trellis-v2-venv}"
 PYTHON="${PYTHON:-python3}"
 TORCH_INDEX_URL="${TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu124}"
 SETUP_FLAGS=(--basic --flash-attn --nvdiffrast --nvdiffrec --cumesh --o-voxel --flexgemm)

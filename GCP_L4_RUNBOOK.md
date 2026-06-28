@@ -44,31 +44,34 @@ Run TRELLIS.2 on GCP L4 reproducibly, with all fixes captured in the fork and no
 - `flash-attn==2.7.3` installs with `--no-build-isolation`.
 - Torch stack includes matching `torch`, `torchvision`, and `torchaudio` 2.6.0/cu124.
 - `scripts/setup_gcp_l4.sh` delegates to upstream `setup.sh` instead of the obsolete TRELLIS v1 stack.
+- GCP scripts default to `~/trellis-v2-venv`.
 - `scripts/run_gcp_demo.sh` uses TRELLIS.2 defaults: `flash_attn` + `flex_gemm`.
+- `scripts/run_gcp_demo.sh` uses public `ZhengPeng7/BiRefNet` by default because upstream `briaai/RMBG-2.0` is gated.
 
 ## HF Model Cache Without Token on VM
 
-DINOv3 is gated:
+DINOv3 is gated and must be copied from the Mac where HF is already authenticated:
 
 - `facebook/dinov3-vitl16-pretrain-lvd1689m`
 
-Download locally, where HF is already authenticated:
-
 ```bash
 hf download facebook/dinov3-vitl16-pretrain-lvd1689m
-hf download microsoft/TRELLIS.2-4B
-```
 
-Copy cache dirs to VM without copying HF credentials:
-
-```bash
 tar -C ~/.cache/huggingface -cf - \
   hub/models--facebook--dinov3-vitl16-pretrain-lvd1689m \
-  hub/models--microsoft--TRELLIS.2-4B \
 | gcloud compute ssh trellis-demo \
     --zone us-west1-a \
     --project gen-lang-client-0206455006 \
     --command='mkdir -p ~/.cache/huggingface && tar -C ~/.cache/huggingface -xf -'
+```
+
+Download public model caches on the VM without a token:
+
+```bash
+source ~/trellis-v2-venv/bin/activate
+hf download microsoft/TRELLIS.2-4B
+hf download microsoft/TRELLIS-image-large
+hf download ZhengPeng7/BiRefNet
 ```
 
 ## Run App
@@ -79,14 +82,15 @@ Prefer SSH with port forwarding in `trellis-ssh:0.0`:
 gcloud compute ssh trellis-demo \
   --zone us-west1-a \
   --project gen-lang-client-0206455006 \
-  -- -L 7860:localhost:7860
+  --ssh-flag='-o ServerAliveInterval=30' \
+  --ssh-flag='-o ServerAliveCountMax=20' \
+  --ssh-flag='-L 7860:localhost:7860'
 ```
 
 Then in the VM:
 
 ```bash
 cd ~/trellis.v2
-source ~/trellis-v2-venv/bin/activate
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 bash scripts/run_gcp_demo.sh
